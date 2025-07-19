@@ -317,10 +317,17 @@
                 const validCenters = [];
                 for (let i = 0; i < numCharts; i++) {
                     // Find a random star to center on
-                    const centerStar = filteredStars[Math.floor(Math.random() * filteredStars.length)];
-                    const ra = centerStar.geometry.coordinates[0];
-                    const dec = centerStar.geometry.coordinates[1];
-                    validCenters.push({ ra, dec });
+                    while (true) {
+                        const centerStar = filteredStars[Math.floor(Math.random() * filteredStars.length)];
+                        const ra = centerStar.geometry.coordinates[0];
+                        const dec = centerStar.geometry.coordinates[1];
+
+                        // fix overflow of sky chart
+                        if ((Math.abs(ra + fov / 2) <= 180) && (Math.abs(ra - fov / 2) <= 180)) {
+                            validCenters.push({ ra, dec });
+                            break;
+                        }
+                    }
                 }
 
                 for (let i = 0; i < numCharts; i++) {
