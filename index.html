@@ -82,6 +82,14 @@
                 display: none;
             }
 
+            .header {
+                display: none;
+            }
+
+            .chartName {
+                display: none;
+            }
+
             body {
                 background-color: white;
                 margin: 0;
@@ -127,7 +135,11 @@
 </head>
 
 <body>
-    <h1>Astronomy Sky Chart Practice (Sketch Generator)</h1>
+    <div class="header">
+        <h1>Astronomy Sky Chart Practice (Sketch Generator)</h1>
+        <h4>Author: Ali Naderi (khod.naderi@gmail.com)</h4>
+        <h4>Made by hand and artificial intelligence</h4>
+    </div>
 
     <div class="controls">
         <div class="control-group">
@@ -316,12 +328,13 @@
                     chartDiv.className = 'chart-container';
 
                     const title = document.createElement('h2');
+                    title.classList.add("chartName");
                     title.textContent = `Observation Practice Chart ${i + 1}`;
                     chartDiv.appendChild(title);
 
                     const canvas = document.createElement('canvas');
-                    canvas.width = 800;
-                    canvas.height = 800;
+                    canvas.width = 1100;
+                    canvas.height = 750;
                     chartDiv.appendChild(canvas);
 
                     chartsContainer.appendChild(chartDiv);
