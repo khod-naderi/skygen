@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Sketch Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .controls {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input,
+        select {
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            grid-column: 1 / -1;
+            justify-self: start;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            grid-column: 1 / -1;
+        }
+
+        canvas {
+            background-color: white;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+        }
+
+        .chart-container {
+            page-break-after: always;
+            margin-bottom: 30px;
+        }
+
+        @media print {
+
+            .controls,
+            button {
+                display: none;
+            }
+
+            body {
+                background-color: white;
+                margin: 0;
+                padding: 0;
+            }
+
+            .chart-container {
+                page-break-after: always;
+                margin: 0;
+                padding: 0;
+            }
+
+            canvas {
+                border: none;
+                box-shadow: none;
+            }
+        }
+
+        .status {
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            grid-column: 1 / -1;
+        }
+
+        .range-slider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .range-slider input {
+            flex: 1;
+        }
+
+        .range-values {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Astronomy Sky Chart Practice (Sketch Generator)</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="numCharts">Number of Charts:</label>
+            <input type="number" id="numCharts" min="1" max="20" value="5">
+        </div>
+
+        <div class="control-group">
+            <label for="fov">Field of View (degrees):</label>
+            <input type="number" id="fov" min="5" max="180" value="30">
+        </div>
+
+        <div class="control-group">
+            <label for="projection">Projection:</label>
+            <select id="projection">
+                <option value="stereographic">Stereographic</option>
+                <option value="mercator">Mercator</option>
+                <option value="linear" selected>Linear</option>
+                <option value="equalarea">Equal Area</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="decRange">Declination Range:</label>
+            <div class="range-slider">
+                <input type="range" id="decRangeMin" min="-90" max="90" value="-90" step="1">
+                <span>to</span>
+                <input type="range" id="decRangeMax" min="-90" max="90" value="90" step="1">
+            </div>
+            <div class="range-values">
+                <span id="decRangeMinValue">-90°</span>
+                <span id="decRangeMaxValue">90°</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label for="magnitudeLimit">Magnitude Limit:</label>
+            <select id="magnitudeLimit">
+                <option value="4">4.0 (very bright)</option>
+                <option value="5">5.0</option>
+                <option value="6" selected>6.0 (naked eye limit)</option>
+                <option value="7">7.0</option>
+                <option value="8">8.0 (binoculars)</option>
+                <option value="9">9.0</option>
+                <option value="10">10.0 (small telescope)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label for="starSizeFactor">Star Size Factor:</label>
+            <input type="range" id="starSizeFactor" min="0.5" max="3" step="0.1" value="1">
+            <span id="starSizeValue">1.0</span>
+        </div>
+
+        <div class="control-group">
+            <label for="showMagnitudes">Show Magnitudes:</label>
+            <input type="checkbox" id="showMagnitudes" checked>
+        </div>
+
+        <div class="control-group">
+            <label for="showStarNames">Show Star Names:</label>
+            <input type="checkbox" id="showStarNames" checked>
+        </div>
+
+        <div class="control-group">
+            <label for="showGrid">Show RA/DEC Grid:</label>
+            <input type="checkbox" id="showGrid" checked>
+        </div>
+
+        <div class="status" id="status">
+            Loading star data from server...
+        </div>
+
+        <div class="button-group">
+            <button id="generateBtn" disabled>Generate Charts</button>
+            <button id="printBtn">Print Charts</button>
+        </div>
+    </div>
+
+    <div id="chartsContainer"></div>
+
+    <script>
+        let starData = [];
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const generateBtn = document.getElementById('generateBtn');
+            const printBtn = document.getElementById('printBtn');
+            const chartsContainer = document.getElementById('chartsContainer');
+            const starSizeFactor = document.getElementById('starSizeFactor');
+            const starSizeValue = document.getElementById('starSizeValue');
+            const status = document.getElementById('status');
+            const decRangeMin = document.getElementById('decRangeMin');
+            const decRangeMax = document.getElementById('decRangeMax');
+            const decRangeMinValue = document.getElementById('decRangeMinValue');
+            const decRangeMaxValue = document.getElementById('decRangeMaxValue');
+
+            // Update declination range display
+            function updateDecRange() {
+                decRangeMinValue.textContent = `${decRangeMin.value}°`;
+                decRangeMaxValue.textContent = `${decRangeMax.value}°`;
+
+                // Ensure min <= max
+                if (parseInt(decRangeMin.value) > parseInt(decRangeMax.value)) {
+                    const temp = decRangeMin.value;
+                    decRangeMin.value = decRangeMax.value;
+                    decRangeMax.value = temp;
+                }
+            }
+
+            decRangeMin.addEventListener('input', updateDecRange);
+            decRangeMax.addEventListener('input', updateDecRange);
+            starSizeFactor.addEventListener('input', function () {
+                starSizeValue.textContent = this.value;
+            });
+
+            // Automatically load stars.json from server
+            async function loadStarData() {
+                try {
+                    const response = await fetch('stars.json');
+                    if (!response.ok) throw new Error('Network response was not ok');
+
+                    const data = await response.json();
+                    if (data.features && data.features.length > 0) {
+                        starData = data.features;
+                        status.textContent = `Loaded ${starData.length} stars from server`;
+                        generateBtn.disabled = false;
+                    } else {
+                        throw new Error('Invalid stars.json format - no features found');
+                    }
+                } catch (err) {
+                    status.textContent = `Error loading star data: ${err.message}`;
+                    console.error('Error loading star data:', err);
+                }
+            }
+
+            // Initial load
+            loadStarData();
+
+            generateBtn.addEventListener('click', generateCharts);
+            printBtn.addEventListener('click', function () {
+                window.print();
+            });
+
+            function generateCharts() {
+                if (starData.length === 0) {
+                    status.textContent = 'No star data available - please check server connection';
+                    return;
+                }
+
+                chartsContainer.innerHTML = '';
+
+                const numCharts = parseInt(document.getElementById('numCharts').value);
+                const fov = parseInt(document.getElementById('fov').value);
+                const projection = document.getElementById('projection').value;
+                const minDec = parseInt(decRangeMin.value);
+                const maxDec = parseInt(decRangeMax.value);
+                const magnitudeLimit = parseFloat(document.getElementById('magnitudeLimit').value);
+                const showMagnitudes = document.getElementById('showMagnitudes').checked;
+                const showStarNames = document.getElementById('showStarNames').checked;
+                const showGrid = document.getElementById('showGrid').checked;
+                const sizeFactor = parseFloat(starSizeFactor.value);
+
+                // Filter stars within declination range
+                const filteredStars = starData.filter(star => {
+                    const dec = star.geometry.coordinates[1];
+                    return dec >= minDec && dec <= maxDec;
+                });
+
+                if (filteredStars.length === 0) {
+                    status.textContent = `No stars found in declination range ${minDec}° to ${maxDec}°`;
+                    return;
+                }
+
+                // Generate random centers within declination range
+                const validCenters = [];
+                for (let i = 0; i < numCharts; i++) {
+                    // Find a random star to center on
+                    const centerStar = filteredStars[Math.floor(Math.random() * filteredStars.length)];
+                    const ra = centerStar.geometry.coordinates[0];
+                    const dec = centerStar.geometry.coordinates[1];
+                    validCenters.push({ ra, dec });
+                }
+
+                for (let i = 0; i < numCharts; i++) {
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'chart-container';
+
+                    const title = document.createElement('h2');
+                    title.textContent = `Observation Practice Chart ${i + 1}`;
+                    chartDiv.appendChild(title);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 800;
+                    canvas.height = 800;
+                    chartDiv.appendChild(canvas);
+
+                    chartsContainer.appendChild(chartDiv);
+
+                    drawSkyChart(
+                        canvas,
+                        validCenters[i].ra,
+                        validCenters[i].dec,
+                        fov,
+                        projection,
+                        minDec,
+                        maxDec,
+                        magnitudeLimit,
+                        showMagnitudes,
+                        showStarNames,
+                        showGrid,
+                        sizeFactor
+                    );
+                }
+
+                status.textContent = `Generated ${numCharts} charts using ${filteredStars.length} stars (Dec ${minDec}° to ${maxDec}°)`;
+            }
+
+            function projectPoint(ra, dec, centerRA, centerDec, fov, projection) {
+                // Convert RA/Dec to relative coordinates
+                let raOffset = (ra - centerRA) * Math.cos(centerDec * Math.PI / 180);
+                let decOffset = dec - centerDec;
+
+                // Handle RA wrapping
+                if (raOffset > 180) raOffset -= 360;
+                if (raOffset < -180) raOffset += 360;
+
+                // Apply projection
+                switch (projection) {
+                    case 'stereographic':
+                        // Stereographic projection
+                        const R = 180 / Math.PI;
+                        const k = 2 / (1 + Math.sin(centerDec * Math.PI / 180) * Math.sin(dec * Math.PI / 180) +
+                            Math.cos(centerDec * Math.PI / 180) * Math.cos(dec * Math.PI / 180) * Math.cos(raOffset * Math.PI / 180));
+                        raOffset = k * Math.cos(dec * Math.PI / 180) * Math.sin(raOffset * Math.PI / 180) * R;
+                        decOffset = k * (Math.cos(centerDec * Math.PI / 180) * Math.sin(dec * Math.PI / 180) -
+                            Math.sin(centerDec * Math.PI / 180) * Math.cos(dec * Math.PI / 180) * Math.cos(raOffset * Math.PI / 180)) * R;
+                        break;
+
+                    case 'mercator':
+                        // Mercator projection
+                        raOffset = raOffset;
+                        decOffset = Math.log(Math.tan(Math.PI / 4 + dec * Math.PI / 360)) * 180 / Math.PI -
+                            Math.log(Math.tan(Math.PI / 4 + centerDec * Math.PI / 360)) * 180 / Math.PI;
+                        break;
+
+                    case 'equalarea':
+                        // Lambert azimuthal equal-area projection
+                        const R_eq = 180 / Math.PI * Math.sqrt(2);
+                        const k_eq = Math.sqrt(2 / (1 + Math.sin(centerDec * Math.PI / 180) * Math.sin(dec * Math.PI / 180) +
+                            Math.cos(centerDec * Math.PI / 180) * Math.cos(dec * Math.PI / 180) * Math.cos(raOffset * Math.PI / 180)));
+                        raOffset = k_eq * Math.cos(dec * Math.PI / 180) * Math.sin(raOffset * Math.PI / 180) * R_eq;
+                        decOffset = k_eq * (Math.cos(centerDec * Math.PI / 180) * Math.sin(dec * Math.PI / 180) -
+                            Math.sin(centerDec * Math.PI / 180) * Math.cos(dec * Math.PI / 180) * Math.cos(raOffset * Math.PI / 180)) * R_eq;
+                        break;
+
+                    case 'linear':
+                    default:
+                        // Linear projection (default)
+                        break;
+                }
+
+                return { raOffset, decOffset };
+            }
+
+            function drawSkyChart(canvas, centerRA, centerDec, fov, projection,
+                minDec, maxDec, magnitudeLimit, showMagnitudes,
+                showStarNames, showGrid, sizeFactor) {
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+                const scale = width / fov;
+
+                // Clear canvas
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, width, height);
+
+                // Draw grid if enabled
+                if (showGrid) {
+                    ctx.strokeStyle = '#ddd';
+                    ctx.lineWidth = 1;
+
+                    // Horizontal lines (Dec)
+                    for (let decOffset = -fov / 2; decOffset <= fov / 2; decOffset += fov / 10) {
+                        const projected = projectPoint(centerRA, centerDec + decOffset,
+                            centerRA, centerDec, fov, projection);
+                        const y = height / 2 - projected.decOffset * scale;
+
+                        if (y >= 0 && y <= height) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(width, y);
+                            ctx.stroke();
+
+                            // Label
+                            if (Math.abs(decOffset) > fov / 20) { // Don't label very close to center
+                                ctx.fillStyle = '#999';
+                                ctx.font = '12px Arial';
+                                ctx.fillText(`${(centerDec + decOffset).toFixed(1)}°`, 5, y - 5);
+                            }
+                        }
+                    }
+
+                    // Vertical lines (RA)
+                    for (let raOffset = -fov / 2; raOffset <= fov / 2; raOffset += fov / 10) {
+                        const projected = projectPoint(centerRA + raOffset / Math.cos(centerDec * Math.PI / 180), centerDec,
+                            centerRA, centerDec, fov, projection);
+                        const x = width / 2 - projected.raOffset * scale;
+
+                        if (x >= 0 && x <= width) {
+                            ctx.beginPath();
+                            ctx.moveTo(x, 0);
+                            ctx.lineTo(x, height);
+                            ctx.stroke();
+
+                            // Label
+                            if (Math.abs(raOffset) > fov / 20) { // Don't label very close to center
+                                ctx.fillStyle = '#999';
+                                ctx.font = '12px Arial';
+                                ctx.fillText(`${((centerRA + raOffset / 15 + 24) % 24).toFixed(1)}h`, x + 5, 15);
+                            }
+                        }
+                    }
+
+                    // Center cross
+                    ctx.strokeStyle = '#999';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(width / 2, 0);
+                    ctx.lineTo(width / 2, height);
+                    ctx.moveTo(0, height / 2);
+                    ctx.lineTo(width, height / 2);
+                    ctx.stroke();
+                }
+
+                // Title
+                ctx.fillStyle = 'black';
+                ctx.font = '16px Arial';
+                ctx.fillText(`Center: RA ${centerRA.toFixed(2)}°, Dec ${centerDec.toFixed(2)}° | FOV: ${fov}° | Projection: ${projection} | Mag limit: ${magnitudeLimit}`, 20, 30);
+
+                // Draw stars from the loaded data
+                for (const star of starData) {
+                    const ra = star.geometry.coordinates[0];
+                    const dec = star.geometry.coordinates[1];
+                    const mag = star.properties.mag;
+                    const name = star.properties.name;
+
+                    // Skip if beyond magnitude limit or declination range
+                    if (mag > magnitudeLimit || dec < minDec || dec > maxDec) continue;
+
+                    // Project the point
+                    const { raOffset, decOffset } = projectPoint(ra, dec, centerRA, centerDec, fov, projection);
+
+                    // Skip if outside FOV
+                    if (Math.abs(raOffset) > fov / 2 || Math.abs(decOffset) > fov / 2) continue;
+
+                    // Calculate position on canvas
+                    const x = width / 2 - raOffset * scale;
+                    const y = height / 2 - decOffset * scale;
+
+                    // Skip if outside canvas (for projections that may map outside)
+                    if (x < 0 || x > width || y < 0 || y > height) continue;
+
+                    // Draw star (size based on magnitude and size factor)
+                    const baseSize = 0.5 + (magnitudeLimit - mag) * 0.5;
+                    const size = baseSize * sizeFactor;
+                    ctx.fillStyle = 'black';
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Label magnitudes if enabled
+                    if (mag < magnitudeLimit - 1 && showMagnitudes && Math.random() < 0.5) {
+                        ctx.fillStyle = '#666';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(mag.toFixed(1), x + size + 2, y + size / 2);
+                    }
+
+                    // Label named stars if enabled
+                    if (name && showStarNames) {
+                        ctx.fillStyle = 'blue';
+                        ctx.font = '12px Arial';
+                        ctx.fillText(name, x + size + 2, y - size - 2);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
