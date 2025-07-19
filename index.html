@@ -418,7 +418,7 @@
                 ctx.fillRect(0, 0, width, height);
 
                 // Draw grid if enabled
-                if (showGrid) {
+                if (showGrid && projection === "linear") {
                     ctx.strokeStyle = '#ddd';
                     ctx.lineWidth = 1;
 
