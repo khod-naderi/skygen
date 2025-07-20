@@ -209,6 +209,11 @@
             <input type="checkbox" id="showGrid" checked>
         </div>
 
+        <div class="control-group">
+            <label for="sameMag">Same Magnitudes:</label>
+            <input type="checkbox" id="sameMag">
+        </div>
+
         <div class="status" id="status">
             Loading star data from server...
         </div>
@@ -299,6 +304,7 @@
                 const magnitudeLimit = parseFloat(document.getElementById('magnitudeLimit').value);
                 const showMagnitudes = document.getElementById('showMagnitudes').checked;
                 const showStarNames = document.getElementById('showStarNames').checked;
+                const sameMag = document.getElementById('sameMag').checked;
                 const showGrid = document.getElementById('showGrid').checked;
                 const sizeFactor = parseFloat(starSizeFactor.value);
 
@@ -358,7 +364,8 @@
                         showMagnitudes,
                         showStarNames,
                         showGrid,
-                        sizeFactor
+                        sizeFactor,
+                        sameMag
                     );
                 }
 
@@ -414,7 +421,7 @@
 
             function drawSkyChart(canvas, centerRA, centerDec, fov, projection,
                 minDec, maxDec, magnitudeLimit, showMagnitudes,
-                showStarNames, showGrid, sizeFactor) {
+                showStarNames, showGrid, sizeFactor, sameMag) {
                 const ctx = canvas.getContext('2d');
                 const width = canvas.width;
                 const height = canvas.height;
@@ -511,7 +518,7 @@
                     if (x < 0 || x > width || y < 0 || y > height) continue;
 
                     // Draw star (size based on magnitude and size factor)
-                    const baseSize = 0.5 + (6.5 - mag) * 0.5;
+                    const baseSize = sameMag ? 1.5 : 0.5 + (6.5 - mag) * 0.5;
                     const size = baseSize * sizeFactor;
                     ctx.fillStyle = 'black';
                     ctx.beginPath();
